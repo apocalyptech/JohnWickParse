@@ -881,9 +881,10 @@ impl NewableWithNameMap for FStructFallback {
                 Some(data) => data,
                 None => break,
             };
-            if arr_idx >= 0 {
-                println!("Got tag: {}, {}", tag.name, tag.property_type);
-            }
+            // apoc
+            //if arr_idx >= 0 {
+            //    println!("Got tag: {}, {}", tag.name, tag.property_type);
+            //}
 
             properties.push(tag);
         }
