@@ -1708,6 +1708,7 @@ impl UScriptMap {
 struct TempSerializeTuple<'a, K, V> {
     key: &'a K,
     value: &'a V,
+    index: u32,
 }
 
 impl<'a, K,V> Serialize for TempSerializeTuple<'a, K, V>
@@ -1717,6 +1718,7 @@ where
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         let mut map = serializer.serialize_map(Some(2))?;
+        map.serialize_entry("_jwp_arr_idx", &self.index)?;
         map.serialize_entry("key", self.key)?;
         map.serialize_entry("value", self.value)?;
         map.end()
@@ -1726,10 +1728,11 @@ where
 impl Serialize for UScriptMap {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         let mut seq = serializer.serialize_seq(Some(self.map_data.len()))?;
-        for e in &self.map_data {
+        for (i, e) in self.map_data.iter().enumerate() {
             let obj = TempSerializeTuple {
                 key: &e.0,
                 value: &e.1,
+                index: i as u32,
             };
             seq.serialize_element(&obj)?;
         }
