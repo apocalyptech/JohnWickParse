@@ -554,13 +554,13 @@ impl PackageExport for USkeleton {
 impl USkeleton {
     pub(super) fn new(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap, export_idx: u32) -> ParserResult<Self> {
         let super_object = UObject::new(reader, name_map, import_map, "Skeleton", export_idx)?;
-        let reference_skeleton = FReferenceSkeleton::new_n(reader, name_map, import_map)?;
+        let reference_skeleton = FReferenceSkeleton::new_n(reader, name_map, import_map, -1)?;
 
         let mut anim_retarget_sources = Vec::new();
         let anim_length = reader.read_u32::<LittleEndian>()?;
         for _i in 0..anim_length {
             let retarget_name = read_fname(reader, name_map)?;
-            let retarget_pose = FReferencePose::new_n(reader, name_map, import_map)?;
+            let retarget_pose = FReferencePose::new_n(reader, name_map, import_map, -1)?;
             anim_retarget_sources.push((retarget_name, retarget_pose));
         }
 

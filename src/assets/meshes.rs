@@ -339,8 +339,8 @@ impl FSkeletalMaterial {
 }
 
 impl NewableWithNameMap for FSkeletalMaterial {
-    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap) -> ParserResult<Self> {
-        let material_interface = FPackageIndex::new_n(reader, name_map, import_map)?;
+    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
+        let material_interface = FPackageIndex::new_n(reader, name_map, import_map, -1)?;
         let serialize_slot_name = reader.read_u32::<LittleEndian>()? != 0;
         let material_slot_name = match serialize_slot_name {
             true => read_fname(reader, name_map)?,
@@ -426,7 +426,7 @@ impl FMeshBoneInfo {
 }
 
 impl NewableWithNameMap for FMeshBoneInfo {
-    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             name: read_fname(reader, name_map)?,
             parent_index: reader.read_i32::<LittleEndian>()?,
@@ -452,7 +452,7 @@ impl FReferenceSkeleton {
 }
 
 impl NewableWithNameMap for FReferenceSkeleton {
-    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         let ref_bone_info = read_tarray_n(reader, name_map, import_map)?;
         let ref_bone_pose = read_tarray(reader)?;
         let index_count = reader.read_u32::<LittleEndian>()?;
@@ -475,7 +475,7 @@ pub struct FReferencePose {
 }
 
 impl NewableWithNameMap for FReferencePose {
-    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             pose_name: read_fname(reader, name_map)?,
             reference_pose: read_tarray(reader)?,
@@ -572,7 +572,7 @@ impl FSkelMeshRenderSection {
 }
 
 impl NewableWithNameMap for FSkelMeshRenderSection {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         let flags = FStripDataFlags::new(reader)?;
         let material_index = reader.read_i16::<LittleEndian>()?;
         let base_index = reader.read_i32::<LittleEndian>()?;
@@ -726,7 +726,7 @@ impl USkeletalMesh {
         let flags = FStripDataFlags::new(reader)?;
         let imported_bounds = FBoxSphereBounds::new(reader)?;
         let materials: Vec<FSkeletalMaterial> = read_tarray_n(reader, name_map, import_map)?;
-        let ref_skeleton = FReferenceSkeleton::new_n(reader, name_map, import_map)?;
+        let ref_skeleton = FReferenceSkeleton::new_n(reader, name_map, import_map, -1)?;
 
         if !flags.is_editor_data_stripped() {
             println!("editor data still present");

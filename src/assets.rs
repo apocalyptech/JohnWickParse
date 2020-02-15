@@ -96,7 +96,7 @@ impl Newable for FGuid {
 }
 
 impl NewableWithNameMap for FGuid {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         FGuid::new(reader)
     }
 }
@@ -223,7 +223,7 @@ fn read_tarray_n<S>(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &
     let mut container = Vec::new();
 
     for _i in 0..length {
-        container.push(S::new_n(reader, name_map, import_map)?);
+        container.push(S::new_n(reader, name_map, import_map, _i as i64)?);
     }
 
     Ok(container)
@@ -272,7 +272,7 @@ impl Newable for i16 {
 }
 
 impl NewableWithNameMap for String {
-    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         read_fname(reader, name_map)
     }
 }
@@ -489,7 +489,7 @@ type NameMap = Vec<FNameEntrySerialized>;
 type ImportMap = Vec<Rc<FObjectImport>>;
 
 trait NewableWithNameMap: std::fmt::Debug + TraitSerialize {
-    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap) -> ParserResult<Self>
+    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self>
     where Self: Sized;
 
     // This seems ridiculous... but there's no way I'm satisifying the requirements for Any on this trait
@@ -514,6 +514,7 @@ fn read_fname(reader: &mut ReaderCursor, name_map: &NameMap) -> ParserResult<Str
 pub struct FPackageIndex {
     index: i32,
     import: Option<Rc<FObjectImport>>,
+    arr_idx: i64,
 }
 
 impl FPackageIndex {
@@ -533,13 +534,14 @@ impl FPackageIndex {
 }
 
 impl NewableWithNameMap for FPackageIndex {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         let index = reader.read_i32::<LittleEndian>()?;
         let import = FPackageIndex::get_package(index, import_map);
         
         Ok(Self {
             index,
             import,
+            arr_idx,
         })
     }
 }
@@ -548,6 +550,9 @@ impl Serialize for FPackageIndex {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         if self.index >= 0 {
             let mut state = serializer.serialize_struct("FObjectExport", 1)?;
+            if self.arr_idx >= 0 {
+                state.serialize_field("_jwp_arr_idx", &self.arr_idx)?;
+            }
             state.serialize_field("export", &self.index)?;
             if self.index > 0 {
                 unsafe {
@@ -601,7 +606,7 @@ impl fmt::Debug for FObjectImport {
 }
 
 impl NewableWithNameMap for FObjectImport {
-    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         let class_package = read_fname(reader, name_map)?;
         let class_name = read_fname(reader, name_map)?;
         let outer_index = reader.read_i32::<LittleEndian>()?;
@@ -649,12 +654,12 @@ struct FObjectExport {
 }
 
 impl NewableWithNameMap for FObjectExport {
-    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
-            class_index: FPackageIndex::new_n(reader, name_map, import_map)?,
-            super_index: FPackageIndex::new_n(reader, name_map, import_map)?,
-            template_index: FPackageIndex::new_n(reader, name_map, import_map)?,
-            outer_index: FPackageIndex::new_n(reader, name_map, import_map)?,
+            class_index: FPackageIndex::new_n(reader, name_map, import_map, -1)?,
+            super_index: FPackageIndex::new_n(reader, name_map, import_map, -1)?,
+            template_index: FPackageIndex::new_n(reader, name_map, import_map, -1)?,
+            outer_index: FPackageIndex::new_n(reader, name_map, import_map, -1)?,
             object_name: read_fname(reader, name_map)?,
             save: reader.read_u32::<LittleEndian>()?,
             serial_size: reader.read_i64::<LittleEndian>()?,
@@ -732,7 +737,7 @@ pub struct FSoftObjectPath {
 }
 
 impl NewableWithNameMap for FSoftObjectPath {
-    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             asset_path_name: read_fname(reader, name_map)?,
             sub_path_string: read_string(reader)?,
@@ -746,7 +751,7 @@ struct FGameplayTagContainer {
 }
 
 impl NewableWithNameMap for FGameplayTagContainer {
-    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         let length = reader.read_u32::<LittleEndian>()?;
         let mut container = Vec::new();
 
@@ -767,7 +772,7 @@ struct FIntPoint {
 }
 
 impl NewableWithNameMap for FIntPoint {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             x: reader.read_u32::<LittleEndian>()?,
             y: reader.read_u32::<LittleEndian>()?,
@@ -797,7 +802,7 @@ impl FVector2D {
 }
 
 impl NewableWithNameMap for FVector2D {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Self::new(reader)
     }
 }
@@ -811,7 +816,7 @@ struct FLinearColor {
 }
 
 impl NewableWithNameMap for FLinearColor {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             r: reader.read_f32::<LittleEndian>()?,
             g: reader.read_f32::<LittleEndian>()?,
@@ -841,7 +846,7 @@ impl Newable for FColor {
 }
 
 impl NewableWithNameMap for FColor {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Self::new(reader)
     }
 }
@@ -852,14 +857,33 @@ struct FStructFallback {
 }
 
 impl NewableWithNameMap for FStructFallback {
-    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         let mut properties = Vec::new();
+        if arr_idx >= 0 {
+            // apoc
+            //println!("Got an FStructFallback with arr_idx {}", arr_idx);
+            properties.push(FPropertyTag {
+                name: "_jwp_arr_idx".to_string(),
+                property_type: "UInt32Property".to_string(),
+                //tag_data: FPropertyTagType::UInt32Property(arr_idx as u32),
+                //tag_data: FPropertyTagData::ByteProperty(arr_idx.to_string()),
+                tag_data: FPropertyTagData::NoData,
+                size: 4,
+                array_index: 0,
+                property_guid: None,
+                //tag: None,
+                tag: Some(FPropertyTagType::UInt32Property(arr_idx as u32)),
+            });
+        }
         loop {
             let tag = read_property_tag(reader, name_map, import_map, true)?;
             let tag = match tag {
                 Some(data) => data,
                 None => break,
             };
+            if arr_idx >= 0 {
+                println!("Got tag: {}, {}", tag.name, tag.property_type);
+            }
 
             properties.push(tag);
         }
@@ -913,7 +937,7 @@ struct FLevelSequenceObjectReferenceMap {
 }
 
 impl NewableWithNameMap for FLevelSequenceObjectReferenceMap {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         let mut map_data = Vec::new();
         let element_count = reader.read_i32::<LittleEndian>()?;
         for _i in 0..element_count {
@@ -944,14 +968,14 @@ struct FMovieSceneSegment {
 }
 
 impl NewableWithNameMap for FMovieSceneSegment {
-    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         let range: TRange<i32> = TRange::new(reader)?;
         let id = reader.read_i32::<LittleEndian>()?;
         let allow_empty = reader.read_u32::<LittleEndian>()? != 0;
         let num_structs = reader.read_u32::<LittleEndian>()?;
         let mut impls: Vec<UScriptStruct> = Vec::new();
         for _i in 0..num_structs {
-            impls.push(UScriptStruct::new(reader, name_map, import_map, "SectionEvaluationData")?);
+            impls.push(UScriptStruct::new(reader, name_map, import_map, "SectionEvaluationData", _i as i64)?);
         }
         Ok(Self {
             range, id, allow_empty, impls,
@@ -1023,7 +1047,7 @@ impl<T> Newable for TEvaluationTreeEntryContainer<T> where T: Newable {
 }
 
 impl<T> NewableWithNameMap for TEvaluationTreeEntryContainer<T> where T: NewableWithNameMap + Serialize {
-    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             entries: read_tarray(reader)?,
             items: read_tarray_n(reader, name_map, import_map)?,
@@ -1070,10 +1094,10 @@ struct TMovieSceneEvaluationTree<T> {
 }
 
 impl<T> NewableWithNameMap for TMovieSceneEvaluationTree<T> where T: NewableWithNameMap + Serialize {
-    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             base_tree: FMovieSceneEvaluationTree::new(reader)?,
-            data: TEvaluationTreeEntryContainer::new_n(reader, name_map, import_map)?,
+            data: TEvaluationTreeEntryContainer::new_n(reader, name_map, import_map, -1)?,
         })
     }
 }
@@ -1084,9 +1108,9 @@ struct FSectionEvaluationDataTree {
 }
 
 impl NewableWithNameMap for FSectionEvaluationDataTree {
-    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
-            tree: TMovieSceneEvaluationTree::new_n(reader, name_map, import_map)?,
+            tree: TMovieSceneEvaluationTree::new_n(reader, name_map, import_map, -1)?,
         })
     }
 }
@@ -1099,11 +1123,11 @@ struct InlineUStruct {
 }
 
 impl NewableWithNameMap for InlineUStruct {
-    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         let type_name = read_string(reader)?;
         Ok(Self {
             type_name,
-            data: FStructFallback::new_n(reader, name_map, import_map)?,
+            data: FStructFallback::new_n(reader, name_map, import_map, -1)?,
         })
     }
 }
@@ -1114,7 +1138,7 @@ struct FMovieSceneFrameRange {
 }
 
 impl NewableWithNameMap for FMovieSceneFrameRange {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             value: TRange::new(reader)?,
         })
@@ -1128,7 +1152,7 @@ struct FI32 {
 }
 
 impl NewableWithNameMap for FI32 {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             value: reader.read_i32::<LittleEndian>()?,
         })
@@ -1147,7 +1171,7 @@ struct FU32 {
 }
 
 impl NewableWithNameMap for FU32 {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             value: reader.read_u32::<LittleEndian>()?,
         })
@@ -1168,7 +1192,7 @@ struct FMovieSceneEvaluationKey {
 }
 
 impl NewableWithNameMap for FMovieSceneEvaluationKey {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             sequence_id: reader.read_u32::<LittleEndian>()?,
             track_identifier: reader.read_i32::<LittleEndian>()?,
@@ -1233,7 +1257,7 @@ impl FQuat {
 }
 
 impl NewableWithNameMap for FQuat {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Self::new(reader)
     }
 }
@@ -1289,7 +1313,7 @@ impl Newable for FVector {
 }
 
 impl NewableWithNameMap for FVector {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Self::new(reader)
     }
 }
@@ -1345,7 +1369,7 @@ impl Newable for FVector4 {
 }
 
 impl NewableWithNameMap for FVector4 {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Self::new(reader)
     }
 }
@@ -1358,7 +1382,7 @@ struct FRotator {
 }
 
 impl NewableWithNameMap for FRotator {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             pitch: reader.read_f32::<LittleEndian>()?,
             yaw: reader.read_f32::<LittleEndian>()?,
@@ -1374,7 +1398,7 @@ struct FPerPlatformFloat {
 }
 
 impl NewableWithNameMap for FPerPlatformFloat {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             cooked: reader.read_u8()? != 0,
             value: reader.read_f32::<LittleEndian>()?,
@@ -1389,7 +1413,7 @@ struct FPerPlatformInt {
 }
 
 impl NewableWithNameMap for FPerPlatformInt {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             cooked: reader.read_u8()? != 0,
             value: reader.read_u32::<LittleEndian>()?,
@@ -1405,7 +1429,7 @@ struct FWeightedRandomSampler {
 }
 
 impl NewableWithNameMap for FWeightedRandomSampler {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             prob: read_tarray(reader)?,
             alias: read_tarray(reader)?,
@@ -1427,7 +1451,7 @@ struct FRichCurveKey {
 }
 
 impl NewableWithNameMap for FRichCurveKey {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             interp_mode: reader.read_u8()?,
             tangent_mode: reader.read_u8()?,
@@ -1453,7 +1477,7 @@ struct FSmartName {
 }
 
 impl NewableWithNameMap for FSmartName {
-    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             display_name: read_fname(reader, name_map)?,
         })
@@ -1490,7 +1514,7 @@ struct FSimpleCurveKey {
 }
 
 impl NewableWithNameMap for FSimpleCurveKey {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             time: reader.read_f32::<LittleEndian>()?,
             value: reader.read_f32::<LittleEndian>()?,
@@ -1504,7 +1528,7 @@ struct FDateTime {
 }
 
 impl NewableWithNameMap for FDateTime {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             date: reader.read_i64::<LittleEndian>()?,
         })
@@ -1519,7 +1543,7 @@ pub struct FScriptDelegate {
 }
 
 impl NewableWithNameMap for FScriptDelegate {
-    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             object: reader.read_i32::<LittleEndian>()?,
             name: read_fname(reader, name_map)?,
@@ -1528,42 +1552,42 @@ impl NewableWithNameMap for FScriptDelegate {
 }
 
 impl UScriptStruct {
-    fn new(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap, struct_name: &str) -> ParserResult<Self> {
+    fn new(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap, struct_name: &str, arr_idx: i64) -> ParserResult<Self> {
         let err = |v| ParserError::add(v, format!("Struct Type: {}", struct_name));
         let struct_type: Box<dyn NewableWithNameMap> = match struct_name {
-            "Vector2D" => Box::new(FVector2D::new_n(reader, name_map, import_map).map_err(err)?),
-			"Box2D" => Box::new(FVector2D::new_n(reader, name_map, import_map).map_err(err)?),
-            "LinearColor" => Box::new(FLinearColor::new_n(reader, name_map, import_map).map_err(err)?),
-            "Color" => Box::new(FColor::new_n(reader, name_map, import_map).map_err(err)?),
-            "GameplayTagContainer" => Box::new(FGameplayTagContainer::new_n(reader, name_map, import_map).map_err(err)?),
-            "IntPoint" => Box::new(FIntPoint::new_n(reader, name_map, import_map).map_err(err)?),
+            "Vector2D" => Box::new(FVector2D::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+			"Box2D" => Box::new(FVector2D::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "LinearColor" => Box::new(FLinearColor::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "Color" => Box::new(FColor::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "GameplayTagContainer" => Box::new(FGameplayTagContainer::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "IntPoint" => Box::new(FIntPoint::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
             "Guid" => Box::new(FGuid::new(reader).map_err(err)?),
-            "Quat" => Box::new(FQuat::new_n(reader, name_map, import_map).map_err(err)?),
-            "Vector" => Box::new(FVector::new_n(reader, name_map, import_map).map_err(err)?),
-            "Rotator" => Box::new(FRotator::new_n(reader, name_map, import_map).map_err(err)?),
-            "PerPlatformFloat" => Box::new(FPerPlatformFloat::new_n(reader, name_map, import_map).map_err(err)?),
-            "PerPlatformInt" => Box::new(FPerPlatformInt::new_n(reader, name_map, import_map).map_err(err)?),
-            "SkeletalMeshSamplingLODBuiltData" => Box::new(FWeightedRandomSampler::new_n(reader, name_map, import_map).map_err(err)?),
-            "SoftObjectPath" => Box::new(FSoftObjectPath::new_n(reader, name_map, import_map).map_err(err)?),
-            "SoftClassPath" => Box::new(FSoftObjectPath::new_n(reader, name_map, import_map).map_err(err)?),
-            "LevelSequenceObjectReferenceMap" => Box::new(FLevelSequenceObjectReferenceMap::new_n(reader, name_map, import_map).map_err(err)?),
-            "FrameNumber" => Box::new(FI32::new_n(reader, name_map, import_map).map_err(err)?),
-            "SectionEvaluationDataTree" => Box::new(FSectionEvaluationDataTree::new_n(reader, name_map, import_map).map_err(err)?),
-            "MovieSceneTrackIdentifier" => Box::new(FI32::new_n(reader, name_map, import_map).map_err(err)?),
-            "MovieSceneSegment" => Box::new(FMovieSceneSegment::new_n(reader, name_map, import_map).map_err(err)?),
-            "MovieSceneEvalTemplatePtr" => Box::new(InlineUStruct::new_n(reader, name_map, import_map).map_err(err)?),
-            "MovieSceneTrackImplementationPtr" => Box::new(InlineUStruct::new_n(reader, name_map, import_map).map_err(err)?),
-            "MovieSceneSequenceInstanceDataPtr" => Box::new(InlineUStruct::new_n(reader, name_map, import_map).map_err(err)?),
-            "MovieSceneFrameRange" => Box::new(FMovieSceneFrameRange::new_n(reader, name_map, import_map).map_err(err)?),
-            "MovieSceneSegmentIdentifier" => Box::new(FI32::new_n(reader, name_map, import_map).map_err(err)?),
-            "MovieSceneSequenceID" => Box::new(FU32::new_n(reader, name_map, import_map).map_err(err)?),
-            "MovieSceneEvaluationKey" => Box::new(FMovieSceneEvaluationKey::new_n(reader, name_map, import_map).map_err(err)?),
-            "SmartName" => Box::new(FSmartName::new_n(reader, name_map, import_map).map_err(err)?),
-            "RichCurveKey" => Box::new(FRichCurveKey::new_n(reader, name_map, import_map).map_err(err)?),
-            "SimpleCurveKey" => Box::new(FSimpleCurveKey::new_n(reader, name_map, import_map).map_err(err)?),
-            "DateTime" => Box::new(FDateTime::new_n(reader, name_map, import_map).map_err(err)?),
-            "Timespan" => Box::new(FDateTime::new_n(reader, name_map, import_map).map_err(err)?),
-            _ => Box::new(FStructFallback::new_n(reader, name_map, import_map).map_err(err)?),
+            "Quat" => Box::new(FQuat::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "Vector" => Box::new(FVector::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "Rotator" => Box::new(FRotator::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "PerPlatformFloat" => Box::new(FPerPlatformFloat::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "PerPlatformInt" => Box::new(FPerPlatformInt::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "SkeletalMeshSamplingLODBuiltData" => Box::new(FWeightedRandomSampler::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "SoftObjectPath" => Box::new(FSoftObjectPath::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "SoftClassPath" => Box::new(FSoftObjectPath::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "LevelSequenceObjectReferenceMap" => Box::new(FLevelSequenceObjectReferenceMap::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "FrameNumber" => Box::new(FI32::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "SectionEvaluationDataTree" => Box::new(FSectionEvaluationDataTree::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "MovieSceneTrackIdentifier" => Box::new(FI32::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "MovieSceneSegment" => Box::new(FMovieSceneSegment::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "MovieSceneEvalTemplatePtr" => Box::new(InlineUStruct::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "MovieSceneTrackImplementationPtr" => Box::new(InlineUStruct::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "MovieSceneSequenceInstanceDataPtr" => Box::new(InlineUStruct::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "MovieSceneFrameRange" => Box::new(FMovieSceneFrameRange::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "MovieSceneSegmentIdentifier" => Box::new(FI32::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "MovieSceneSequenceID" => Box::new(FU32::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "MovieSceneEvaluationKey" => Box::new(FMovieSceneEvaluationKey::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "SmartName" => Box::new(FSmartName::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "RichCurveKey" => Box::new(FRichCurveKey::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "SimpleCurveKey" => Box::new(FSimpleCurveKey::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "DateTime" => Box::new(FDateTime::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "Timespan" => Box::new(FDateTime::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            _ => Box::new(FStructFallback::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
         };
         Ok(Self {
             struct_name: struct_name.to_owned(),
@@ -1613,7 +1637,7 @@ impl UScriptArray {
                 contents.push(FPropertyTagType::ByteProperty(reader.read_u8()?));
                 continue;
             }
-            contents.push(FPropertyTagType::new(reader, name_map, import_map, &inner_type, inner_tag_data)?);
+            contents.push(FPropertyTagType::new(reader, name_map, import_map, &inner_type, inner_tag_data, _i as i64)?);
         }
 
         Ok(Self {
@@ -1649,13 +1673,13 @@ fn read_map_value(reader: &mut ReaderCursor, inner_type: &str, struct_type: &str
         "EnumProperty" => FPropertyTagType::EnumProperty(Some(read_fname(reader, name_map)?)),
         "IntProperty" => FPropertyTagType::IntProperty(reader.read_i32::<LittleEndian>()?),
         "UInt32Property" => FPropertyTagType::UInt32Property(reader.read_u32::<LittleEndian>()?),
-        "StructProperty" => FPropertyTagType::StructProperty(UScriptStruct::new(reader, name_map, import_map, struct_type)?),
+        "StructProperty" => FPropertyTagType::StructProperty(UScriptStruct::new(reader, name_map, import_map, struct_type, -1)?),
         "NameProperty" => FPropertyTagType::NameProperty(read_fname(reader, name_map)?),
-        "ObjectProperty" => FPropertyTagType::ObjectProperty(FPackageIndex::new_n(reader, name_map, import_map)?),
-        "SoftObjectProperty" => FPropertyTagType::SoftObjectPropertyMap(FGuid::new_n(reader, name_map, import_map)?),
+        "ObjectProperty" => FPropertyTagType::ObjectProperty(FPackageIndex::new_n(reader, name_map, import_map, -1)?),
+        "SoftObjectProperty" => FPropertyTagType::SoftObjectPropertyMap(FGuid::new_n(reader, name_map, import_map, -1)?),
 		"StrProperty" => FPropertyTagType::StrProperty(read_string(reader)?),
 		"TextProperty" => FPropertyTagType::TextProperty(FText::new(reader)?),
-        _ => FPropertyTagType::StructProperty(UScriptStruct::new(reader, name_map, import_map, inner_type)?),
+        _ => FPropertyTagType::StructProperty(UScriptStruct::new(reader, name_map, import_map, inner_type, -1)?),
     })
 }
 
@@ -1718,7 +1742,7 @@ pub struct UInterfaceProperty {
 }
 
 impl NewableWithNameMap for UInterfaceProperty {
-    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap) -> ParserResult<Self> {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
             interface_number: reader.read_u32::<LittleEndian>()?,
         })
@@ -1763,7 +1787,12 @@ pub enum FPropertyTagType {
 
 impl FPropertyTagType {
     fn new(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap,
-                    property_type: &str, tag_data: Option<&FPropertyTagData>) -> ParserResult<Self> {
+                    property_type: &str, tag_data: Option<&FPropertyTagData>,
+                    arr_idx: i64) -> ParserResult<Self> {
+        // apocalyptech: using i64 so I can pass -1 when it's not in an array
+        //if arr_idx >= 0 {
+        //    println!("Got propertytagtype arr_idx {}, property_type {}", arr_idx, property_type);
+        //}
         Ok(match property_type {
             "BoolProperty" => FPropertyTagType::BoolProperty(
                 match tag_data.unwrap() {
@@ -1773,12 +1802,12 @@ impl FPropertyTagType {
             ),
             "StructProperty" => FPropertyTagType::StructProperty(
                 match tag_data.unwrap() {
-                    FPropertyTagData::StructProperty(name, _guid) => UScriptStruct::new(reader, name_map, import_map, name)?,
+                    FPropertyTagData::StructProperty(name, _guid) => UScriptStruct::new(reader, name_map, import_map, name, arr_idx)?,
                     _ => panic!("Struct does not have struct data"),
                 }
             ),
-            "ObjectProperty" => FPropertyTagType::ObjectProperty(FPackageIndex::new_n(reader, name_map, import_map)?),
-            "InterfaceProperty" => FPropertyTagType::InterfaceProperty(UInterfaceProperty::new_n(reader, name_map, import_map)?),
+            "ObjectProperty" => FPropertyTagType::ObjectProperty(FPackageIndex::new_n(reader, name_map, import_map, arr_idx)?),
+            "InterfaceProperty" => FPropertyTagType::InterfaceProperty(UInterfaceProperty::new_n(reader, name_map, import_map, arr_idx)?),
             "FloatProperty" =>  FPropertyTagType::FloatProperty(reader.read_f32::<LittleEndian>()?),
             "TextProperty" => FPropertyTagType::TextProperty(FText::new(reader)?),
             "StrProperty" => FPropertyTagType::StrProperty(read_string(reader)?),
@@ -1813,8 +1842,8 @@ impl FPropertyTagType {
                     _ => panic!("Enum property does not have enum data"),
                 }
             ),
-            "DelegateProperty" => FPropertyTagType::DelegateProperty(FScriptDelegate::new_n(reader, name_map, import_map)?),
-            "SoftObjectProperty" => FPropertyTagType::SoftObjectProperty(FSoftObjectPath::new_n(reader, name_map, import_map)?),
+            "DelegateProperty" => FPropertyTagType::DelegateProperty(FScriptDelegate::new_n(reader, name_map, import_map, arr_idx)?),
+            "SoftObjectProperty" => FPropertyTagType::SoftObjectProperty(FSoftObjectPath::new_n(reader, name_map, import_map, arr_idx)?),
             _ => return Err(ParserError::new(format!("Could not read property type: {} at pos {}", property_type, reader.position()))),
         })
     }
@@ -1868,6 +1897,8 @@ fn read_property_tag(reader: &mut ReaderCursor, name_map: &NameMap, import_map: 
     let size = reader.read_i32::<LittleEndian>()?;
     let array_index = reader.read_i32::<LittleEndian>()?;
 
+    // apoc
+    //println!("Got property type {}", property_type);
     let mut tag_data = match property_type.as_ref() {
         "StructProperty" => FPropertyTagData::StructProperty(read_fname(reader, name_map)?, FGuid::new(reader)?),
         "BoolProperty" => FPropertyTagData::BoolProperty(reader.read_u8()? != 0),
@@ -1897,7 +1928,7 @@ fn read_property_tag(reader: &mut ReaderCursor, name_map: &NameMap, import_map: 
 
     let pos = reader.position();
     let tag = match read_data {
-        true => Some(FPropertyTagType::new(reader, name_map, import_map, property_type.as_ref(), Some(&tag_data)).map_err(|v| ParserError::add(v, property_desc))?),
+        true => Some(FPropertyTagType::new(reader, name_map, import_map, property_type.as_ref(), Some(&tag_data), -1).map_err(|v| ParserError::add(v, property_desc))?),
         false => None,
     };
     let final_pos = pos + (size as u64);
@@ -2378,7 +2409,7 @@ impl Package {
         let mut import_map = Vec::new();
         cursor.seek(SeekFrom::Start(summary.import_offset as u64))?;
         for _i in 0..summary.import_count {
-            import_map.push(Rc::new(FObjectImport::new_n(&mut cursor, &name_map, &import_map)?));
+            import_map.push(Rc::new(FObjectImport::new_n(&mut cursor, &name_map, &import_map, _i as i64)?));
         }
 
         for import in &import_map {
@@ -2388,7 +2419,7 @@ impl Package {
         let mut export_map = Vec::new();
         cursor.seek(SeekFrom::Start(summary.export_offset as u64))?;
         for _i in 0..summary.export_count {
-            export_map.push(FObjectExport::new_n(&mut cursor, &name_map, &import_map)?);
+            export_map.push(FObjectExport::new_n(&mut cursor, &name_map, &import_map, _i as i64)?);
         }
 
         let export_size = export_map.iter().fold(0, |acc, v| v.serial_size + acc);
