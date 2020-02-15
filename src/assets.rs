@@ -2183,6 +2183,11 @@ impl Serialize for UObject {
         let mut map = serializer.serialize_map(Some(self.properties.len() + 1))?;
         map.serialize_entry("export_type", &self.export_type)?;
         if self.export_idx > 0 {
+            // apoc - magic number here for my own data-library purposes.  Bump this version if
+            // I want it to trigger re-serializations the next time data's being read.
+            if self.export_idx == 1 {
+                map.serialize_entry("_apoc_data_ver", &1)?;
+            }
             map.serialize_entry("_jwp_export_idx", &self.export_idx)?;
             unsafe {
                 map.serialize_entry("_jwp_is_asset", &EXPORT_OBJECTS[(self.export_idx-1) as usize].is_asset)?;
