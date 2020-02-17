@@ -2188,6 +2188,10 @@ impl Serialize for UObject {
             // apoc - magic number here for my own data-library purposes.  Bump this version if
             // I want it to trigger re-serializations the next time data's being read.
             if self.export_idx == 1 {
+                // An in-code changelog!  What a great idea!
+                //   v1: Initial versioning, added export-following, expanded output, and array
+                //       indexes
+                //   v2: Added array indexes to FSoftObjectPath objects
                 map.serialize_entry("_apoc_data_ver", &2)?;
             }
             map.serialize_entry("_jwp_export_idx", &self.export_idx)?;
