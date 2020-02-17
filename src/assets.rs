@@ -734,6 +734,7 @@ impl Serialize for FText {
 pub struct FSoftObjectPath {
     asset_path_name: String,
     sub_path_string: String,
+    _jwp_arr_idx: i64,
 }
 
 impl NewableWithNameMap for FSoftObjectPath {
@@ -741,6 +742,7 @@ impl NewableWithNameMap for FSoftObjectPath {
         Ok(Self {
             asset_path_name: read_fname(reader, name_map)?,
             sub_path_string: read_string(reader)?,
+            _jwp_arr_idx: arr_idx,
         })
     }
 }
@@ -2186,7 +2188,7 @@ impl Serialize for UObject {
             // apoc - magic number here for my own data-library purposes.  Bump this version if
             // I want it to trigger re-serializations the next time data's being read.
             if self.export_idx == 1 {
-                map.serialize_entry("_apoc_data_ver", &1)?;
+                map.serialize_entry("_apoc_data_ver", &2)?;
             }
             map.serialize_entry("_jwp_export_idx", &self.export_idx)?;
             unsafe {
