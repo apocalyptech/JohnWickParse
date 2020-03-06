@@ -557,7 +557,8 @@ impl Serialize for FPackageIndex {
             state.serialize_field("export", &self.index)?;
             if self.index > 0 {
                 unsafe {
-                    state.serialize_field("_jwp_export_dst_type", EXPORT_TYPES[(self.index-1) as usize])?;
+                    state.serialize_field("_jwp_export_dst_type", &EXPORT_TYPES[(self.index-1) as usize])?;
+                    state.serialize_field("_jwp_export_dst_name", &EXPORT_NAMES[(self.index-1) as usize])?;
                 }
             }
             state.end()
@@ -2193,12 +2194,13 @@ impl Serialize for UObject {
                 //   v1: Initial versioning, added export-following, expanded output, and array
                 //       indexes
                 //   v2: Added array indexes to FSoftObjectPath objects
-                map.serialize_entry("_apoc_data_ver", &2)?;
+                //   v3: Added _jwp_export_dst_name to export references
+                map.serialize_entry("_apoc_data_ver", &3)?;
             }
             map.serialize_entry("_jwp_export_idx", &self.export_idx)?;
             unsafe {
-                map.serialize_entry("_jwp_is_asset", &EXPORT_OBJECTS[(self.export_idx-1) as usize].is_asset)?;
-                map.serialize_entry("_jwp_object_name", &EXPORT_OBJECTS[(self.export_idx-1) as usize].object_name)?;
+                map.serialize_entry("_jwp_is_asset", &EXPORT_IS_ASSET[(self.export_idx-1) as usize])?;
+                map.serialize_entry("_jwp_object_name", &EXPORT_NAMES[(self.export_idx-1) as usize])?;
             }
         }
         for property in &self.properties {
@@ -2407,8 +2409,9 @@ pub struct Package {
     import_map: Vec<Rc<FObjectImport>>,
 }
 
-static mut EXPORT_TYPES:Vec<&String> = Vec::new();
-static mut EXPORT_OBJECTS:Vec<&FObjectExport> = Vec::new();
+static mut EXPORT_TYPES:Vec<String> = Vec::new();
+static mut EXPORT_IS_ASSET:Vec<bool> = Vec::new();
+static mut EXPORT_NAMES:Vec<String> = Vec::new();
 
 #[allow(dead_code)]
 impl Package {
@@ -2477,8 +2480,18 @@ impl Package {
             export_idx = export_idx + 1;
             exports.push(export);
             unsafe {
-                EXPORT_TYPES.push(export_type);
-                EXPORT_OBJECTS.push(&v);
+                // We need to own some of this data in order to avoid E0597 and another error which
+                // Rust 1.41.1 started being more vigilant about:
+                // https://blog.rust-lang.org/2020/02/27/Rust-1.41.1.html#a-soundness-hole-in-checking-static-items
+                // Also we used to store the whole `v` object in a static EXPORT_OBJECTS vector,
+                // but we're now pulling it apart here, for similar reasons.  (There's probably a
+                // way around it, but I didn't care enough to fight through it.)
+                let export_type_exp = export_type.to_owned();
+                let is_asset = v.is_asset.to_owned();
+                let object_name = v.object_name.to_owned();
+                EXPORT_TYPES.push(export_type_exp);
+                EXPORT_IS_ASSET.push(is_asset);
+                EXPORT_NAMES.push(object_name);
             }
         }
 
