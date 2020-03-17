@@ -2195,7 +2195,8 @@ impl Serialize for UObject {
                 //       indexes
                 //   v2: Added array indexes to FSoftObjectPath objects
                 //   v3: Added _jwp_export_dst_name to export references
-                map.serialize_entry("_apoc_data_ver", &3)?;
+                //   v4: 2020-03-13 patch (Steam x-play)
+                map.serialize_entry("_apoc_data_ver", &4)?;
             }
             map.serialize_entry("_jwp_export_idx", &self.export_idx)?;
             unsafe {
