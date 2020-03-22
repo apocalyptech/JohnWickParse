@@ -16,6 +16,17 @@ mod material_instance;
 mod anims;
 mod meshes;
 
+// apoc - magic number here for my own data-library purposes.  Bump this version if
+// I want it to trigger re-serializations the next time data's being read.
+// An in-code changelog!  What a great idea!
+//   v1: Initial versioning, added export-following, expanded output, and array
+//       indexes
+//   v2: Added array indexes to FSoftObjectPath objects
+//   v3: Added _jwp_export_dst_name to export references
+//   v4: 2020-03-13 patch (Steam x-play)
+//   v5: Cleaning up DataTable exports a bit (my custom attrs were a bit too pushy)
+const APOC_DATA_VER: u32 = 5;
+
 pub use anims::{USkeleton, UAnimSequence, FTrack};
 pub use meshes::{USkeletalMesh, FMultisizeIndexContainer, FStaticMeshVertexDataTangent, FSkeletalMeshRenderData,
     FSkelMeshRenderSection, FSkeletalMaterial, FSkinWeightVertexBuffer, FMeshBoneInfo, FStaticMeshVertexDataUV, FReferenceSkeleton};
@@ -2187,21 +2198,15 @@ impl Serialize for UObject {
         let mut map = serializer.serialize_map(Some(self.properties.len() + 1))?;
         map.serialize_entry("export_type", &self.export_type)?;
         if self.export_idx > 0 {
-            // apoc - magic number here for my own data-library purposes.  Bump this version if
-            // I want it to trigger re-serializations the next time data's being read.
-            if self.export_idx == 1 {
-                // An in-code changelog!  What a great idea!
-                //   v1: Initial versioning, added export-following, expanded output, and array
-                //       indexes
-                //   v2: Added array indexes to FSoftObjectPath objects
-                //   v3: Added _jwp_export_dst_name to export references
-                //   v4: 2020-03-13 patch (Steam x-play)
-                map.serialize_entry("_apoc_data_ver", &4)?;
-            }
-            map.serialize_entry("_jwp_export_idx", &self.export_idx)?;
             unsafe {
-                map.serialize_entry("_jwp_is_asset", &EXPORT_IS_ASSET[(self.export_idx-1) as usize])?;
-                map.serialize_entry("_jwp_object_name", &EXPORT_NAMES[(self.export_idx-1) as usize])?;
+                if SERIALIZE_APOC_HEADER {
+                    if self.export_idx == 1 {
+                        map.serialize_entry("_apoc_data_ver", &APOC_DATA_VER)?;
+                    }
+                    map.serialize_entry("_jwp_export_idx", &self.export_idx)?;
+                    map.serialize_entry("_jwp_is_asset", &EXPORT_IS_ASSET[(self.export_idx-1) as usize])?;
+                    map.serialize_entry("_jwp_object_name", &EXPORT_NAMES[(self.export_idx-1) as usize])?;
+                }
             }
         }
         for property in &self.properties {
@@ -2338,6 +2343,14 @@ impl Serialize for UDataTable {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         let mut map = serializer.serialize_map(Some((self.rows.len() + 1) as usize))?;
         map.serialize_entry("export_type", "DataTable")?;
+        map.serialize_entry("_apoc_data_ver", &APOC_DATA_VER)?;
+        unsafe {
+            // Making some assumptions here, hopefully it doesn't bite us.  DataTables
+            // probably just have the single export, though
+            SERIALIZE_APOC_HEADER = false;
+            map.serialize_entry("_jwp_is_asset", &EXPORT_IS_ASSET[0 as usize])?;
+            map.serialize_entry("_jwp_object_name", &EXPORT_NAMES[0 as usize])?;
+        }
         for e in &self.rows {
             map.serialize_entry(&e.0, &e.1)?;
         }
@@ -2410,6 +2423,7 @@ pub struct Package {
     import_map: Vec<Rc<FObjectImport>>,
 }
 
+static mut SERIALIZE_APOC_HEADER:bool = true;
 static mut EXPORT_TYPES:Vec<String> = Vec::new();
 static mut EXPORT_IS_ASSET:Vec<bool> = Vec::new();
 static mut EXPORT_NAMES:Vec<String> = Vec::new();
