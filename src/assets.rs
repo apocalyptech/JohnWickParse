@@ -25,7 +25,9 @@ mod meshes;
 //   v3: Added _jwp_export_dst_name to export references
 //   v4: 2020-03-13 patch (Steam x-play)
 //   v5: Cleaning up DataTable exports a bit (my custom attrs were a bit too pushy)
-const APOC_DATA_VER: u32 = 5;
+//   v6: 2020-03-26 - DLC2
+//   v7: 2020-04-23 - Revenge of the Cartels and DLC2
+const APOC_DATA_VER: u32 = 7;
 
 pub use anims::{USkeleton, UAnimSequence, FTrack};
 pub use meshes::{USkeletalMesh, FMultisizeIndexContainer, FStaticMeshVertexDataTangent, FSkeletalMeshRenderData,
