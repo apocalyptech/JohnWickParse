@@ -30,7 +30,8 @@ mod meshes;
 //   v7: 2020-04-23 - Revenge of the Cartels and DLC2
 //   v8: 2020-05-13 - Pulled in some fresh commits from upstream
 //   v9: 2020-06-11 - Guardian Takedown
-const APOC_DATA_VER: u32 = 9;
+//   v10: 2020-06-25 - DLC3
+const APOC_DATA_VER: u32 = 10;
 
 pub use anims::{USkeleton, UAnimSequence, FTrack};
 pub use meshes::{USkeletalMesh, FMultisizeIndexContainer, FStaticMeshVertexDataTangent, FSkeletalMeshRenderData,
