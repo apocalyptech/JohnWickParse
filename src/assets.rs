@@ -16,6 +16,7 @@ pub mod locale;
 mod material_instance;
 mod anims;
 mod meshes;
+mod sound;
 
 // apoc - magic number here for my own data-library purposes.  Bump this version if
 // I want it to trigger re-serializations the next time data's being read.
@@ -31,11 +32,13 @@ mod meshes;
 //   v8: 2020-05-13 - Pulled in some fresh commits from upstream
 //   v9: 2020-06-11 - Guardian Takedown
 //   v10: 2020-06-25 - DLC3
-const APOC_DATA_VER: u32 = 10;
+//   v11: 2020-07-13 - Pulled in more commits from upstream
+const APOC_DATA_VER: u32 = 11;
 
 pub use anims::{USkeleton, UAnimSequence, FTrack};
 pub use meshes::{USkeletalMesh, FMultisizeIndexContainer, FStaticMeshVertexDataTangent, FSkeletalMeshRenderData,
     FSkelMeshRenderSection, FSkeletalMaterial, FSkinWeightVertexBuffer, FMeshBoneInfo, FStaticMeshVertexDataUV, FReferenceSkeleton};
+pub use sound::USoundWave;
 
 pub type ReaderCursor<'c> = Cursor<&'c[u8]>;
 
@@ -521,9 +524,13 @@ serialize_trait_object!(NewableWithNameMap);
 fn read_fname(reader: &mut ReaderCursor, name_map: &NameMap) -> ParserResult<String> {
     let index_pos = reader.position();
     let name_index = reader.read_i32::<LittleEndian>()?;
-    reader.read_i32::<LittleEndian>()?; // name_number ?
+    let name_number = reader.read_i32::<LittleEndian>()?;
+    let name_number_str = "_".to_owned() + &(name_number - 1).to_string();
     match name_map.get(name_index as usize) {
-        Some(data) => Ok(data.data.to_owned()),
+        Some(data) => Ok(data.data.to_owned() + match name_number {
+            0 => "",
+            _ => &name_number_str,
+        }),
         None => Err(ParserError::new(format!("FName could not be read at {} {}", index_pos, name_index))),
     }
 }
@@ -1397,6 +1404,29 @@ impl NewableWithNameMap for FVector4 {
 }
 
 #[derive(Debug, Serialize)]
+struct FBox {
+    min: FVector,
+    max: FVector,
+    valid: bool,
+}
+
+impl Newable for FBox {
+    fn new(reader: &mut ReaderCursor) -> ParserResult<Self> {
+        Ok(Self {
+            min: FVector::new(reader)?,
+            max: FVector::new(reader)?,
+            valid: reader.read_u32::<LittleEndian>()? != 0,
+        })
+    }
+}
+
+impl NewableWithNameMap for FBox {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
+        Self::new(reader)
+    }
+}
+
+#[derive(Debug, Serialize)]
 struct FRotator {
     pitch: f32,
     yaw: f32,
@@ -1578,7 +1608,8 @@ impl UScriptStruct {
         let err = |v| ParserError::add(v, format!("Struct Type: {}", struct_name));
         let struct_type: Box<dyn NewableWithNameMap> = match struct_name {
             "Vector2D" => Box::new(FVector2D::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
-			"Box2D" => Box::new(FVector2D::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "Box2D" => Box::new(FVector2D::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "Box" => Box::new(FBox::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
             "LinearColor" => Box::new(FLinearColor::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
             "Color" => Box::new(FColor::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
             "GameplayTagContainer" => Box::new(FGameplayTagContainer::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
@@ -1812,6 +1843,7 @@ pub enum FPropertyTagType {
     ObjectProperty(FPackageIndex),
     InterfaceProperty(UInterfaceProperty),
     DelegateProperty(FScriptDelegate),
+    MulticastDelegateProperty(Vec<FScriptDelegate>),
     FloatProperty(f32),
     TextProperty(FText),
     StrProperty(String),
@@ -1890,6 +1922,8 @@ impl FPropertyTagType {
                 }
             ),
             "DelegateProperty" => FPropertyTagType::DelegateProperty(FScriptDelegate::new_n(reader, name_map, import_map, arr_idx)?),
+            "MulticastSparseDelegateProperty" => FPropertyTagType::MulticastDelegateProperty(read_tarray_n(reader, name_map, import_map)?),
+            "MulticastInlineDelegateProperty" => FPropertyTagType::MulticastDelegateProperty(read_tarray_n(reader, name_map, import_map)?),
             "SoftObjectProperty" => FPropertyTagType::SoftObjectProperty(FSoftObjectPath::new_n(reader, name_map, import_map, arr_idx)?),
             "FieldPathProperty" => FPropertyTagType::FieldPathProperty(FFieldPath::new_n(reader, name_map, import_map, arr_idx)?),
             _ => return Err(ParserError::new(format!("Could not read property type: {} at pos {}", property_type, reader.position()))),
@@ -1972,7 +2006,7 @@ fn read_property_tag(reader: &mut ReaderCursor, name_map: &NameMap, import_map: 
         false => None,
     };
 
-    let property_desc = format!("Property Tag: {} ({})", name, property_type);
+    let property_desc = format!("Property Tag: {} ({}) {}", name, property_type, size);
 
     let pos = reader.position();
     let tag = match read_data {
@@ -2029,7 +2063,7 @@ impl Newable for FStripDataFlags {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct FByteBulkDataHeader {
     bulk_data_flags: i32,
     element_count: i32,
@@ -2056,6 +2090,12 @@ struct FByteBulkData {
 impl std::fmt::Debug for FByteBulkData {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "Header: {:?} {}", self.header, self.data.len())
+    }
+}
+
+impl Serialize for FByteBulkData {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        self.header.serialize(serializer)
     }
 }
 
@@ -2221,6 +2261,13 @@ impl UObject {
             }
             acc
         })
+    }
+
+    pub fn get_boolean(&self, name: &str) -> Option<bool> {
+        match self.get_property(name) {
+            Some(FPropertyTagType::BoolProperty(bool_property)) => Some(*bool_property),
+            _ => None,
+        }
     }
 }
 
@@ -2523,6 +2570,7 @@ impl Package {
                 "AnimSequence" => Box::new(UAnimSequence::new(&mut cursor, &name_map, &import_map, export_idx)?),
                 "Skeleton" => Box::new(USkeleton::new(&mut cursor, &name_map, &import_map, export_idx)?),
                 "CurveTable" => Box::new(UCurveTable::new(&mut cursor, &name_map, &import_map, export_idx)?),
+                "SoundWave" => Box::new(USoundWave::new(&mut cursor, &name_map, &import_map, asset_length, export_size, &mut ubulk_cursor, export_idx)?),
                 //"MaterialInstanceConstant" => Box::new(material_instance::UMaterialInstanceConstant::new(&mut cursor, &name_map, &import_map, export_idx)?),
                 _ => Box::new(UObject::new(&mut cursor, &name_map, &import_map, &export_type, export_idx)?),
             };
@@ -2667,6 +2715,9 @@ fn get_export(export: &Box<dyn Any>) -> Option<&dyn PackageExport> {
     }
     if let Some(curve_table) = export.downcast_ref::<UCurveTable>() {
         return Some(curve_table);
+    }
+    if let Some(sound_wave) = export.downcast_ref::<USoundWave>() {
+        return Some(sound_wave);
     }
     if let Some(material) = export.downcast_ref::<material_instance::UMaterialInstanceConstant>() {
         return Some(material);
