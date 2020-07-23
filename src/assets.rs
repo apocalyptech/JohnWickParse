@@ -33,7 +33,8 @@ mod sound;
 //   v9: 2020-06-11 - Guardian Takedown
 //   v10: 2020-06-25 - DLC3
 //   v11: 2020-07-13 - Pulled in more commits from upstream
-const APOC_DATA_VER: u32 = 11;
+//   v12: 2020-07-23 - Patch from GBX (including lots of drop changes)
+const APOC_DATA_VER: u32 = 12;
 
 pub use anims::{USkeleton, UAnimSequence, FTrack};
 pub use meshes::{USkeletalMesh, FMultisizeIndexContainer, FStaticMeshVertexDataTangent, FSkeletalMeshRenderData,
