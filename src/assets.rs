@@ -34,7 +34,8 @@ mod sound;
 //   v10: 2020-06-25 - DLC3
 //   v11: 2020-07-13 - Pulled in more commits from upstream
 //   v12: 2020-07-23 - Patch from GBX (including lots of drop changes)
-const APOC_DATA_VER: u32 = 12;
+//   v13: 2020-09-04 - Pulled in fresh commits from upstream; can serialize BPChars now!
+const APOC_DATA_VER: u32 = 13;
 
 pub use anims::{USkeleton, UAnimSequence, FTrack};
 pub use meshes::{USkeletalMesh, FMultisizeIndexContainer, FStaticMeshVertexDataTangent, FSkeletalMeshRenderData,
@@ -1428,6 +1429,29 @@ impl NewableWithNameMap for FBox {
 }
 
 #[derive(Debug, Serialize)]
+struct FBox2D {
+    min: FVector2D,
+    max: FVector2D,
+    valid: bool,
+}
+
+impl Newable for FBox2D {
+    fn new(reader: &mut ReaderCursor) -> ParserResult<Self> {
+        Ok(Self {
+            min: FVector2D::new(reader)?,
+            max: FVector2D::new(reader)?,
+            valid: reader.read_u32::<LittleEndian>()? != 0,
+        })
+    }
+}
+
+impl NewableWithNameMap for FBox2D {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
+        Self::new(reader)
+    }
+}
+
+#[derive(Debug, Serialize)]
 struct FRotator {
     pitch: f32,
     yaw: f32,
@@ -1608,9 +1632,6 @@ impl UScriptStruct {
     fn new(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap, struct_name: &str, arr_idx: i64) -> ParserResult<Self> {
         let err = |v| ParserError::add(v, format!("Struct Type: {}", struct_name));
         let struct_type: Box<dyn NewableWithNameMap> = match struct_name {
-            "Vector2D" => Box::new(FVector2D::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
-            "Box2D" => Box::new(FVector2D::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
-            "Box" => Box::new(FBox::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
             "LinearColor" => Box::new(FLinearColor::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
             "Color" => Box::new(FColor::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
             "GameplayTagContainer" => Box::new(FGameplayTagContainer::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
@@ -1618,7 +1639,10 @@ impl UScriptStruct {
             "Guid" => Box::new(FGuid::new(reader).map_err(err)?),
             "Quat" => Box::new(FQuat::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
             "Vector" => Box::new(FVector::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "Vector2D" => Box::new(FVector2D::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
             "Rotator" => Box::new(FRotator::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "Box" => Box::new(FBox::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "Box2D" => Box::new(FVector2D::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
             "PerPlatformFloat" => Box::new(FPerPlatformFloat::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
             "PerPlatformInt" => Box::new(FPerPlatformInt::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
             "SkeletalMeshSamplingLODBuiltData" => Box::new(FWeightedRandomSampler::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
@@ -1923,6 +1947,7 @@ impl FPropertyTagType {
                 }
             ),
             "DelegateProperty" => FPropertyTagType::DelegateProperty(FScriptDelegate::new_n(reader, name_map, import_map, arr_idx)?),
+            "MulticastDelegateProperty" => FPropertyTagType::MulticastDelegateProperty(read_tarray_n(reader, name_map, import_map)?),
             "MulticastSparseDelegateProperty" => FPropertyTagType::MulticastDelegateProperty(read_tarray_n(reader, name_map, import_map)?),
             "MulticastInlineDelegateProperty" => FPropertyTagType::MulticastDelegateProperty(read_tarray_n(reader, name_map, import_map)?),
             "SoftObjectProperty" => FPropertyTagType::SoftObjectProperty(FSoftObjectPath::new_n(reader, name_map, import_map, arr_idx)?),
