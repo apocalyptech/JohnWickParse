@@ -35,7 +35,10 @@ mod sound;
 //   v11: 2020-07-13 - Pulled in more commits from upstream
 //   v12: 2020-07-23 - Patch from GBX (including lots of drop changes)
 //   v13: 2020-09-04 - Pulled in fresh commits from upstream; can serialize BPChars now!
-const APOC_DATA_VER: u32 = 13;
+//   v14: 2020-09-04 - Work around some MapProperty stuff present in some BPChars, though
+//        in a very boneheaded way which seems quite likely to produce technically-incorrect
+//        data.  Hopefully not too bad, though!
+const APOC_DATA_VER: u32 = 14;
 
 pub use anims::{USkeleton, UAnimSequence, FTrack};
 pub use meshes::{USkeletalMesh, FMultisizeIndexContainer, FStaticMeshVertexDataTangent, FSkeletalMeshRenderData,
@@ -1768,12 +1771,16 @@ fn read_map_value(reader: &mut ReaderCursor, inner_type: &str, struct_type: &str
 impl UScriptMap {
     fn new(reader: &mut ReaderCursor, name_map: &NameMap, import_map: &ImportMap, key_type: &str, value_type: &str) -> ParserResult<Self> {
         let num_keys_to_remove = reader.read_i32::<LittleEndian>()?;
+        let err_f = |v| ParserError::add(v, format!("MapProperty error, types: {} {}", key_type, value_type));
         if num_keys_to_remove != 0 {
-            return Err(ParserError::new(format!("Could not read MapProperty with types: {} {}", key_type, value_type)));
+            println!("APOC WARNING: non-zero num_keys_to_resolve ({}) on MapProperty, but boneheadedly continuing regardless.  Data may be invalid!", num_keys_to_remove);
+            for _i in 0..num_keys_to_remove {
+                read_map_value(reader, key_type, "StructProperty", name_map, import_map).map_err(err_f)?;
+            }
+            //return Err(ParserError::new(format!("Could not read MapProperty with types: {} {}", key_type, value_type)));
         }
         let num = reader.read_i32::<LittleEndian>()?;
         let mut map_data: Vec<(FPropertyTagType, FPropertyTagType)> = Vec::new();
-        let err_f = |v| ParserError::add(v, format!("MapProperty error, types: {} {}", key_type, value_type));
         for _i in 0..num {
             map_data.push((
                 read_map_value(reader, key_type, "StructProperty", name_map, import_map).map_err(err_f)?,
