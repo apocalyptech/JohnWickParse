@@ -38,7 +38,8 @@ mod sound;
 //   v14: 2020-09-04 - Work around some MapProperty stuff present in some BPChars, though
 //        in a very boneheaded way which seems quite likely to produce technically-incorrect
 //        data.  Hopefully not too bad, though!
-const APOC_DATA_VER: u32 = 14;
+//   v15: 2020-09-10 - DLC4
+const APOC_DATA_VER: u32 = 15;
 
 pub use anims::{USkeleton, UAnimSequence, FTrack};
 pub use meshes::{USkeletalMesh, FMultisizeIndexContainer, FStaticMeshVertexDataTangent, FSkeletalMeshRenderData,
