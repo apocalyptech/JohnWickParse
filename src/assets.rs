@@ -39,7 +39,8 @@ mod sound;
 //        in a very boneheaded way which seems quite likely to produce technically-incorrect
 //        data.  Hopefully not too bad, though!
 //   v15: 2020-09-10 - DLC4
-const APOC_DATA_VER: u32 = 15;
+//   v16: 2020-11-09 - DLC5 (Designer's Cut)
+const APOC_DATA_VER: u32 = 16;
 
 pub use anims::{USkeleton, UAnimSequence, FTrack};
 pub use meshes::{USkeletalMesh, FMultisizeIndexContainer, FStaticMeshVertexDataTangent, FSkeletalMeshRenderData,
