@@ -40,7 +40,8 @@ mod sound;
 //        data.  Hopefully not too bad, though!
 //   v15: 2020-09-10 - DLC4
 //   v16: 2020-11-09 - DLC5 (Designer's Cut)
-const APOC_DATA_VER: u32 = 16;
+//   v17: 2020-11-10 - An unannounced GBX update, bugfixes for DLC5 I suppose.
+const APOC_DATA_VER: u32 = 17;
 
 pub use anims::{USkeleton, UAnimSequence, FTrack};
 pub use meshes::{USkeletalMesh, FMultisizeIndexContainer, FStaticMeshVertexDataTangent, FSkeletalMeshRenderData,
