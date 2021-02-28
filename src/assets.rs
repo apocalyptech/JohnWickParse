@@ -42,7 +42,8 @@ mod sound;
 //   v16: 2020-11-09 - DLC5 (Designer's Cut)
 //   v17: 2020-11-10 - An unannounced GBX update, bugfixes for DLC5 I suppose.
 //   v18: 2021-01-21 - Just a patch from GBX
-const APOC_DATA_VER: u32 = 18;
+//   v19: 2021-02-28 - Fixed rich curve key processing
+const APOC_DATA_VER: u32 = 19;
 
 pub use anims::{USkeleton, UAnimSequence, FTrack};
 pub use meshes::{USkeletalMesh, FMultisizeIndexContainer, FStaticMeshVertexDataTangent, FSkeletalMeshRenderData,
@@ -1528,6 +1529,7 @@ struct FRichCurveKey {
     tangent_mode: u8,
     tangent_weight_mode: u8,
     time: f32,
+    value: f32,
     arrive_tangent: f32,
     arrive_tangent_weight: f32,
     leave_tangent: f32,
@@ -1541,6 +1543,7 @@ impl NewableWithNameMap for FRichCurveKey {
             tangent_mode: reader.read_u8()?,
             tangent_weight_mode: reader.read_u8()?,
             time: reader.read_f32::<LittleEndian>()?,
+            value: reader.read_f32::<LittleEndian>()?,
             arrive_tangent: reader.read_f32::<LittleEndian>()?,
             arrive_tangent_weight: reader.read_f32::<LittleEndian>()?,
             leave_tangent: reader.read_f32::<LittleEndian>()?,
