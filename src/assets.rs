@@ -541,7 +541,7 @@ fn read_fname(reader: &mut ReaderCursor, name_map: &NameMap) -> ParserResult<Str
             0 => "",
             _ => &name_number_str,
         }),
-        None => Err(ParserError::new(format!("FName could not be read at {} {}", index_pos, name_index))),
+        None => Err(ParserError::new(format!("FName could not be read at {} {}", index_pos, name_index as usize))),
     }
 }
 
@@ -1225,6 +1225,60 @@ impl Serialize for FU32 {
     }
 }
 
+// apoc -- debugging classes for inside UScriptStruct
+#[derive(Debug)]
+struct FApocMatrix {
+}
+
+impl NewableWithNameMap for FApocMatrix {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
+        Ok(Self {
+        })
+    }
+}
+
+impl Serialize for FApocMatrix {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        serializer.serialize_str("(APOC - Unknown UScriptStruct type 'Matrix')")
+    }
+}
+
+#[derive(Debug)]
+struct FApocFloatProperty {
+}
+
+impl NewableWithNameMap for FApocFloatProperty {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
+        Ok(Self {
+        })
+    }
+}
+
+impl Serialize for FApocFloatProperty {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        serializer.serialize_str("(APOC - Unknown UScriptStruct type 'FloatProperty')")
+    }
+}
+
+#[derive(Debug)]
+struct FApocIntVector {
+}
+
+impl NewableWithNameMap for FApocIntVector {
+    fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
+        Ok(Self {
+        })
+    }
+}
+
+impl Serialize for FApocIntVector {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        serializer.serialize_str("(APOC - Unknown UScriptStruct type 'IntVector')")
+    }
+}
+
+// (end apoc custom dummy classes)
+
 #[derive(Debug, Serialize)]
 struct FMovieSceneEvaluationKey {
     sequence_id: u32,
@@ -1677,6 +1731,12 @@ impl UScriptStruct {
             "SimpleCurveKey" => Box::new(FSimpleCurveKey::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
             "DateTime" => Box::new(FDateTime::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
             "Timespan" => Box::new(FDateTime::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            // apoc addition -- allow these to show up here... I think this is correct?
+            "Vector4" => Box::new(FVector4::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            // apoc addition "dummy" vars -- allows some more map assets to be serialized
+            "Matrix" => Box::new(FApocMatrix::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "FloatProperty" => Box::new(FApocFloatProperty::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
+            "IntVector" => Box::new(FApocIntVector::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
             _ => Box::new(FStructFallback::new_n(reader, name_map, import_map, arr_idx).map_err(err)?),
         };
         Ok(Self {
@@ -2623,7 +2683,21 @@ impl Package {
             };
             let valid_pos = position + v.serial_size as u64;
             if cursor.position() != valid_pos {
-                println!("Did not read {} correctly. Current Position: {}, Bytes Remaining: {}", export_type, cursor.position(), valid_pos as i64 - cursor.position() as i64);
+                println!("Did not read export {} ({} \"{}\") correctly. Current Position: {}, Bytes Remaining: {}",
+                    export_idx,
+                    export_type,
+                    v.object_name,
+                    cursor.position(),
+                    valid_pos as i64 - cursor.position() as i64,
+                    );
+            } else {
+                /*
+                println!("Processed export {} ({} \"{}\")",
+                    export_idx,
+                    export_type,
+                    v.object_name,
+                    );
+                */
             }
             export_idx = export_idx + 1;
             exports.push(export);
