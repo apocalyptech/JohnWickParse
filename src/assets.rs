@@ -1225,7 +1225,7 @@ impl Serialize for FU32 {
     }
 }
 
-// apoc -- debugging classes for inside UScriptStruct
+// apoc -- debugging class for inside UScriptStruct
 #[derive(Debug)]
 struct FApocMatrix {
 }
@@ -1243,23 +1243,22 @@ impl Serialize for FApocMatrix {
     }
 }
 
-#[derive(Debug)]
+// apoc - another internal class for inside UScriptStruct, though I believe this one should
+// be Actually Functional
+#[derive(Debug, Serialize)]
 struct FApocFloatProperty {
+    value: f32,
 }
 
 impl NewableWithNameMap for FApocFloatProperty {
     fn new_n(reader: &mut ReaderCursor, _name_map: &NameMap, _import_map: &ImportMap, arr_idx: i64) -> ParserResult<Self> {
         Ok(Self {
+            value: reader.read_f32::<LittleEndian>()?,
         })
     }
 }
 
-impl Serialize for FApocFloatProperty {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        serializer.serialize_str("(APOC - Unknown UScriptStruct type 'FloatProperty')")
-    }
-}
-
+// apoc - another dummy class for inside UScriptStruct
 #[derive(Debug)]
 struct FApocIntVector {
 }
