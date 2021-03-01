@@ -10,6 +10,10 @@ and this fork offers various improvements useful to BL3 modders.  You can still 
 official JWP releases up through 5.0.2 (which was released on July 23, 2020), but releases
 after that point will probably not work with BL3.
 
+As with the original JWP, which was intended only as a Fortnite tool, this fork will almost
+certainly work just fine on other UE4 games, so feel free to give it a try if your UE4
+game hasn't moved to the newer packing method yet.
+
 It offers four commands that can read these files
  * `serialize <asset_path>` will turn a uexp/uasset pair into a .json file, reading the UObject properties. `<asset_path>` has no extension.
  * `filelist <pak_path>` will create a text file, listing all of the files contained in a .pak file.
