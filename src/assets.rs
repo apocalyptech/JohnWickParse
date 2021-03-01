@@ -1968,7 +1968,9 @@ impl FPropertyTagType {
             "MulticastInlineDelegateProperty" => FPropertyTagType::MulticastDelegateProperty(read_tarray_n(reader, name_map, import_map)?),
             "SoftObjectProperty" => FPropertyTagType::SoftObjectProperty(FSoftObjectPath::new_n(reader, name_map, import_map, arr_idx)?),
             "FieldPathProperty" => FPropertyTagType::FieldPathProperty(FFieldPath::new_n(reader, name_map, import_map, arr_idx)?),
-            _ => return Err(ParserError::new(format!("Could not read property type: {} at pos {}", property_type, reader.position()))),
+            // apoc -- handle this a bit more gracefully, rather than aborting the entire serialization
+            _ => FPropertyTagType::StrProperty(format!("(JWP ERR: Unknown property type: {} at pos {})", property_type, reader.position())),
+            //_ => return Err(ParserError::new(format!("Could not read property type: {} at pos {}", property_type, reader.position()))),
         })
     }
 }
