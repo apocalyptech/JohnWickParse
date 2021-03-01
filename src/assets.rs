@@ -2607,7 +2607,10 @@ impl Package {
                 "Texture2D" => Box::new(Texture2D::new(&mut cursor, &name_map, &import_map, asset_length, export_size, &mut ubulk_cursor, export_idx)?),
                 "DataTable" => Box::new(UDataTable::new(&mut cursor, &name_map, &import_map, export_idx)?),
                 "SkeletalMesh" => Box::new(USkeletalMesh::new(&mut cursor, &name_map, &import_map, export_idx)?),
-                "AnimSequence" => Box::new(UAnimSequence::new(&mut cursor, &name_map, &import_map, export_idx)?),
+                // apoc - This custom UAnimSequence ends up making JWP unable to serialize any
+                // Animsequence objects.  Commenting this out lets us at least get the same level
+                // of serialization that FModel can do, which is good enough for me, for now.
+                //"AnimSequence" => Box::new(UAnimSequence::new(&mut cursor, &name_map, &import_map, export_idx)?),
                 "Skeleton" => Box::new(USkeleton::new(&mut cursor, &name_map, &import_map, export_idx)?),
                 "CurveTable" => Box::new(UCurveTable::new(&mut cursor, &name_map, &import_map, export_idx)?),
                 "SoundWave" => Box::new(USoundWave::new(&mut cursor, &name_map, &import_map, asset_length, export_size, &mut ubulk_cursor, export_idx)?),
