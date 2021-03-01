@@ -591,8 +591,10 @@ impl Serialize for FPackageIndex {
             state.serialize_field("export", &self.index)?;
             if self.index > 0 {
                 unsafe {
-                    state.serialize_field("_jwp_export_dst_type", &EXPORT_TYPES[(self.index-1) as usize])?;
-                    state.serialize_field("_jwp_export_dst_name", &EXPORT_NAMES[(self.index-1) as usize])?;
+                    if self.index <= EXPORT_TYPES.len() as i32 {
+                        state.serialize_field("_jwp_export_dst_type", &EXPORT_TYPES[(self.index-1) as usize])?;
+                        state.serialize_field("_jwp_export_dst_name", &EXPORT_NAMES[(self.index-1) as usize])?;
+                    }
                 }
             }
             state.end()
