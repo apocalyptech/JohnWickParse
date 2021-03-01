@@ -1,6 +1,14 @@
-## Fortnite Asset Parser
+## ~~Fortnite~~ Borderlands 3 Asset Parser
 
 This program is able to parse pak, uexp and uasset files, and offers way to manage them.
+
+This is a fork of [SirWaddles's JohnWickParse](https://github.com/SirWaddles/JohnWickParse)
+project, which is intended primarily as a Fortnite tool.  At some point in late-ish 2020,
+Fortnight updated the way they pack their data files, and the original JWP code was updated
+to only work with that newer packing method.  Borderlands 3 still uses the original way,
+and this fork offers various improvements useful to BL3 modders.  You can still use
+official JWP releases up through 5.0.2 (which was released on July 23, 2020), but releases
+after that point will probably not work with BL3.
 
 It offers four commands that can read these files
  * `serialize <asset_path>` will turn a uexp/uasset pair into a .json file, reading the UObject properties. `<asset_path>` has no extension.
